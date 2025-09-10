@@ -27,7 +27,7 @@ The entire system is designed for high performance by logging to a RAM disk, pre
     - `blacklist` / `blacklist_v6`
     - `throttle-soft` / `throttle-soft_v6`
     - `throttle-hard` / `throttle-hard_v6`
-3.  **Log Scanner Script (`log_scanner_dualstack.py`)**: A Python tool that runs on-demand (e.g., via cron) to analyze firewall logs and add offending IPs to the appropriate ipset.
+3.  **Log Scanner Script (`log_scanner.py`)**: A Python tool that runs on-demand (e.g., via cron) to analyze firewall logs and add offending IPs to the appropriate ipset.
 4.  **RAM Disk Logging**: All logs are written to a `tmpfs` (RAM) filesystem at `/ram/iptables.log` for maximum performance and to avoid disk wear.
 5.  **System Services**:
     - **Rsyslog**: Configured to filter and direct firewall logs to the RAM disk.
@@ -140,11 +140,11 @@ sudo ipset save > /etc/sysconfig/ipset
 
 ### Step 6: Deploy the Python Scanner
 
-Save the Python script as `log_scanner_dualstack.py` (e.g., in `/usr/local/sbin/`).
+Save the Python script as `log_scanner.py` (e.g., in `/usr/local/sbin/`).
 
 ```bash
 # Make it executable
-chmod +x /usr/local/sbin/log_scanner_dualstack.py
+chmod +x /usr/local/sbin/log_scanner.py
 ```
 
 ### Step 7: Automate the Scanner (Cron Job)
@@ -157,7 +157,7 @@ crontab -e
 ```
 Add one or more lines to define your scanning rules. For example, to run a scan every 5 minutes:
 ```
-*/5 * * * * /usr/local/sbin/log_scanner_dualstack.py --rule blocked --type tcp --howmany 500 --within 30m --ipset throttle-hard --removeafter 1h >> /var/log/log_scanner.log 2>&1
+*/5 * * * * /usr/local/sbin/log_scanner.py --rule blocked --type tcp --howmany 500 --within 30m --ipset throttle-hard --removeafter 1h >> /var/log/log_scanner.log 2>&1
 ```
 
 ## How It Works
@@ -178,7 +178,7 @@ IPsets are the core of the dynamic system. Instead of adding/removing individual
 
 ### Automated Log Scanner
 
-The `log_scanner_dualstack.py` script is a stateless, one-shot tool. When run, it:
+The `log_scanner.py` script is a stateless, one-shot tool. When run, it:
 1.  Reads the entire `/ram/iptables.log` file.
 2.  Filters lines based on the criteria provided via command-line arguments (e.g., `--rule blocked`, `--type tcp`).
 3.  For each IP, it analyzes its timestamps to see if it has violated the threshold (e.g., more than `--howmany 1000` hits `--within 1h`).
@@ -204,7 +204,7 @@ You can interact with the firewall in real-time by managing the ipsets.
 
 The script is controlled entirely by command-line arguments.
 
-`./log_scanner_dualstack.py [OPTIONS]`
+`./log_scanner.py [OPTIONS]`
 
 | Argument        | Description                                                               | Example         |
 | --------------- | ------------------------------------------------------------------------- | --------------- |
@@ -220,17 +220,17 @@ The script is controlled entirely by command-line arguments.
 
 **Dry Run:** Test a rule to see who would be blacklisted for >100 blocked TCP hits in 5 minutes.
 ```bash
-./log_scanner_dualstack.py --rule blocked --type tcp --howmany 100 --within 5m --ipset blacklist --removeafter 1d --dryrun
+./log_scanner.py --rule blocked --type tcp --howmany 100 --within 5m --ipset blacklist --removeafter 1d --dryrun
 ```
 
 **Hard Throttling:** Add any IP with >500 blocked TCP hits in 30 minutes to the `throttle-hard` list for 2 hours.
 ```bash
-./log_scanner_dualstack.py --rule blocked --type tcp --howmany 500 --within 30m --ipset throttle-hard --removeafter 2h
+./log_scanner.py --rule blocked --type tcp --howmany 500 --within 30m --ipset throttle-hard --removeafter 2h
 ```
 
 **ICMP Flood Protection:** Blacklist any IP sending >200 blocked ICMP packets in 1 minute for 6 hours.
 ```bash
-./log_scanner_dualstack.py --rule blocked --type icmp --howmany 200 --within 1m --ipset blacklist --removeafter 6h
+./log_scanner.py --rule blocked --type icmp --howmany 200 --within 1m --ipset blacklist --removeafter 6h
 ```
 
 ## Configuration and Customization
